@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker-email
+  namespace: default
+  labels:
+    deployment: celery-worker-email
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      pod: celery-worker-email
+  template:
+    metadata:
+      labels:
+        pod: celery-worker-email
+    spec:
+      nodeSelector:
+        for_service: email
+      containers:
+        - name: celery-worker-email
+          image:  "{{ .Values.image.repository}}:{{ .Values.image.tag }}"
+          command: ['celery', '-A', 'eduone_mail.app.task_app.celery_app', 'worker','-P', 'celery_pool_asyncio:TaskPool', '-l', 'info','-Q','queue2','--concurrency=5','-n worker2@%h']
+          env:
+            - name: MAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: email-credentials
+                  key: username
+            - name: MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: email-credentials
+                  key: password
+            - name: MAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: email-credentials
+                  key: mail
+            - name: MAIL_PORT
+              value: "587"
+            - name: MAIL_SERVER
+              value: smtp.gmail.com
+            - name: MAIL_FROM_NAME
+              value: Test
+            - name: TEMPLATE_FOLDER
+              value: eduone_mail/templates/
+            - name: CELERY_BACKEND_URL
+              value: redis://redis:6380/0
+            - name: CELERY_BROKER_URL
+              value: amqp://guest:guest@rabbitmq-1.rabbitmq.default.svc.cluster.local:5672/
+            - name: AWS_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: endpoint
+
+            - name: AWS_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: region_name
+
+
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: access_key
+
+
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: secret_access_key
+
+          resources: { }
+          volumeMounts:
+            - mountPath: /eduone_mail/templates/
+              name: email-claim1
+      imagePullSecrets:
+        - name: gitlab-regcred
+      restartPolicy: Always
+      volumes:
+        - name: email-claim1
+          persistentVolumeClaim:
+            claimName: email-claim1

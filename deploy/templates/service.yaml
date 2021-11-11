@@ -1,0 +1,14 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: email-service
+  namespace: default
+spec:
+  selector:
+    pod: email
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 9001
+    targetPort: 9001
+    nodePort: 30002

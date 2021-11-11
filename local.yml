@@ -1,0 +1,78 @@
+version: "3.7"
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3.8
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=mypass
+
+    ports:
+      - "5672:5672"
+      - "5673:5673"
+    restart: on-failure
+
+
+
+
+  redis:
+    image: "redis:alpine"
+    environment:
+      - REDIS_PASSWORD=password123
+      - REDIS_PORT=6380
+    ports:
+      - "6380:6380"
+    command: --port 6380
+
+
+    expose:
+      - "6380"
+
+    restart: on-failure
+
+  mail-service:
+    build: ./
+    ports:
+      - "9001:9001"
+    env_file:
+      - .env
+    depends_on:
+      - rabbitmq
+      - redis
+    volumes:
+      - "./:/eduone_mail"
+
+
+    command: "uvicorn main:app --host 0.0.0.0 --port 9001 --reload"
+
+
+
+    restart: on-failure
+  celeryworker2:
+    build: ./
+
+    env_file:
+      - .env
+    depends_on:
+      - rabbitmq
+      - redis
+    volumes:
+      - "./:/eduone_mail"
+
+    command: "celery worker -A eduone_mail.app.task_app.celery_app -P celery_pool_asyncio:TaskPool -l DEBUG"
+
+  celery-flower2:
+    build: ""
+    env_file:
+      - .env
+    ports:
+      - "5557:5557"
+    depends_on:
+      - redis
+      - rabbitmq
+      - celeryworker2
+    volumes:
+      - "./:/eduone_mail"
+
+    command: 'celery flower -A eduone_mail.app.task_app.celery_app -port=5557 --persistent=True'
